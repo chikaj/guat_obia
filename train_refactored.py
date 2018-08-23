@@ -19,7 +19,7 @@ import numpy as np
 from glob import glob
 from pprint import pprint
 import fiona
-from shapely.geometry import asShape, mapping
+#from shapely.geometry import asShape, mapping
 from collections import OrderedDict, Iterable
 from rasterstats import zonal_stats
 # import matplotlib
@@ -513,13 +513,13 @@ def main():
 #            Comment/Uncomment the following lines to (de)activate code
 #            to write the segmented (1) raster and (2) vector to disk.
 #            Be sure to properly set the output names.
-#            ---Raster---------------------------------------------------------
+#            ---(1)-Raster-----------------------------------------------------
 #            r_meta = src.meta
 #            r_meta['count'] = 1
 #            r_meta['dtype'] = 'int32'
 #            with rasterio.open("raster_output.tif", "w", **r_meta) as dst:
 #                dst.write(r_output.astype('int32'))
-#            ---Vector---------------------------------------------------------
+#            ---(2)-Vector-----------------------------------------------------
             v_meta = {'driver': 'ESRI Shapefile', 'crs': src.crs.to_dict(),
                       'schema': get_schema_definition(v_output)}
 
