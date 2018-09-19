@@ -55,7 +55,7 @@ def assign_actual(segments_path, training_path):
     pass
 
 
-def train_classifier(segments, output_filename, fields=['count', 'orientation',
+def train_classifier_old(segments, output_filename, fields=['count', 'orientation',
                     'red_mean', 'green_mean', 'blue_mean'], 
                     actual='class_id'):
     """
@@ -137,8 +137,45 @@ def train_classifier(segments, output_filename, fields=['count', 'orientation',
     return best_clf
 
 
-def predict(model, segments, fields=['count', 'orientation', 'red_mean',
-                                     'green_mean', 'blue_mean']):
+def train_classifier(X, Y, output_filename):
+    """
+    Train classification algorithm.
+    
+    Train the Support Vector Machine classification algorithm using the
+    specified fields. 
+
+    Parameters
+    ----------
+    X: Pandas DataFrame
+        A DataFrame with the objects used for training the classifier.
+        Each object has the same number of fields used for training. 
+    
+    Y: Pandas DataFrame
+        A DataFrame with a single field representing the class id. 
+
+    output_filename: string
+        Output filename of the pickled trained SVM model. 
+
+    Returns
+    -------
+    clf: svm.SVC
+        Returns a trained SVM model that can be used to classify other data.
+
+    """
+
+    clf = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
+                   coef0=0.0, decision_function_shape='ovr', degree=3,
+                   gamma=7.694015754766104e-05, kernel='rbf', max_iter=-1,
+                   probability=False, random_state=None, shrinking=True,
+                   tol=0.001, verbose=False)
+    clf.fit(X, Y)
+    pprint(vars(clf))
+    pickle.dump(clf, open(output_filename, "wb"))
+    
+    return clf
+
+
+def predict(model, X):
     """
     Classify segments using SVM model
 
@@ -147,18 +184,20 @@ def predict(model, segments, fields=['count', 'orientation', 'red_mean',
     Parameters
     ----------
      model: svm.SVC
-        A trained SVM model that can be used to classify other data.
+        A trained SVM model that used to classify objects.
 
-    segments: GeoDataFrame
-        Unclassified vector (polygon) segments.
+    X: Pandas DataFrame
+        A DataFrame with the objects used for predicting Y values.
+        Each object has the same number of fields used for training.
 
-    output_filename: string
-        Output filename of the classified segments (as an ESRI Shapefile).
+    Returns
+    -------
+    Y: Pandas DataFrame
+        A DataFrame with the predicted class id for each object.
 
     """
-#    segs = segments[fields] # fix this!!!!
 
-    predictions = model.predict(segments)
+    predictions = model.predict(X)
 
     return predictions
 
@@ -206,40 +245,55 @@ def cross_tabulation(actual, classified):
 
 
 def main():
-    src = gpd.read_file('./segs/training_segments.shp')
+    base_path = '../../Documents/Research/Guatemala/guat_obia/'
+    training_data = base_path + 'segs/training_segments.shp'
+    src = gpd.read_file(training_data)
     
-    fields = ['count', 'perimeter', 'eccentrici', 'equal_diam', 'major_axis',
+    classification_fields = ['count', 'perimeter', 'eccentrici', 'equal_diam', 'major_axis',
               'minor_axis', 'orientatio', 'red_mean', 'green_mean',
               'blue_mean', 'sobel_mean', 'sobel_sum', 'sobel_std']
+    class_id_field = ['class_id']
     
-#    svm_t = train_classifier(src, 'trained_svm_' +
+    training_fraction = 0.50 # Percentage of objects in the training set
+    s = src.query(class_id_field[0] + ' != 0') # Select objects with a class id
+    t = s.sample(frac=training_fraction).sort_index() # Training objects
+    v = s[~s.isin(t)].dropna(subset=[classification_fields[0]]) # Verification objects
+    training_X = t[classification_fields] # Training objects with correct fields
+    training_Y = t[class_id_field].values.reshape(-1).astype(int) # Training objects with correct class id field
+    verification_X = v[classification_fields] # Verification objects with correct fields
+    verification_Y = v[class_id_field].values.reshape(-1).astype(int) # Verification objects with correct class id field
+    
+#    svm_t = train_classifier_old(src, 'trained_svm_' +
 #                             str(datetime.datetime.now()).replace(" ", "_"),
 #                             fields, 'class_id')
 #    pprint(vars(svm_t))
     
-    new_model = pickle.load(open("trained_svm_2018-03-19_21:51:24.707615", "rb"))
-    pprint(vars(new_model))
-
-    random_pct = 0.7
-    verification = src.loc[(src.class_id != 0) &
-                            (src.random < random_pct), fields]
-    verification_class = src.loc[(src.class_id != 0) & (src.random < random_pct),
-                             ['class_id']]
+    svm_t = train_classifier(training_X, training_Y, 'trained_svm_' + 
+                             str(datetime.datetime.now()).replace(" ", "_"))
     
-    X = verification.values
-    Y = verification_class.values.reshape(-1)
+#    pickled_model = base_path + 'trained_svm_2018-03-19_21:51:24.707615'
+#    new_model = pickle.load(open(pickled_model, "rb"))
+#    pprint(vars(new_model))
+#
+#    random_pct = 0.7
+#    verification = src.loc[(src.class_id != 0) &
+#                            (src.random < random_pct), fields]
+#    verification_class = src.loc[(src.class_id != 0) & (src.random < random_pct),
+#                             ['class_id']]
+#    
+#    X = verification.values
+#    Y = verification_class.values.reshape(-1)
+#
+#    predictions = predict(new_model, X)
+    
+    predictions = predict(svm_t, verification_X)
 
-    predictions = predict(new_model, X, fields)
-
-    crosstab = cross_tabulation(Y, predictions)
+    crosstab = cross_tabulation(verification_Y, predictions)
     print(crosstab)
 
     src['best_guess'] = predictions
     src.to_file('whatever.shp')
     
-#tr = src.loc[src.class_id != 0, src.columns.difference(['DN', 'class_id', 'training', 'testing', 'class', 'photo', 'best_guess', 'random', 'geometry'])]
-#tr = src.loc[(src.class_id != 0) & (src.random > 0.85), src.columns.difference(['DN', 'class_id', 'training', 'testing', 'class', 'photo', 'best_guess', 'random', 'geometry'])]
-#tr_id = src.loc[src.class_id != 0, ['class_id']]
 
 if __name__ == "__main__":
     main()
