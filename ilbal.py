@@ -15,17 +15,31 @@ from geopandas import GeoDataFrame as gdf
 import pickle
 from glob import glob
 
+from skimage.segmentation import slic, felzenszwalb
+from sklearn.cluster import DBSCAN
+
 
 def felz(filename):
     with rasterio.open(filename) as src:
-        # perform SLIC0 segmentation becuase it is much! faster
-        rout = dp.felz_segmentation(src)
+        felz_params = {'scale': 100.0,
+                       'sigma': 2,
+                       'min_size': 5000}
+        
+        slic_params = {'n_segments': 150,
+                        'compactness': 0.1,
+                        'sigma': 5,
+                        'slic_zero': True}
+
+        rout = dp.segmentation(model=felzenszwalb, params=felz_params, src=src,
+                               modal_radius=3)
         vout = dp.vectorize(image=rout, transform=src.transform)
         vout = dp.add_zonal_properties(src=src, bands=[1, 2, 3],
                                        band_names=['red', 'green', 'blue'],
                                        stats=['mean','min','max','std'],
                                        gdf=vout)
         # perform clustering (k-means?) on SLIC0 segments
+        t = vout.drop(['dn', 'geometry'], axis=1)
+        clusters = DBSCAN().fit_predict(t)
         # re-do zonal properties for spectral bands, then continue
         vout = dp.add_shape_properties(rout, vout, ['area', 'perimeter',
                                                     'eccentricity', 
@@ -45,9 +59,9 @@ def felz(filename):
 
 
 def main():
-    model_path = "/home/nate/Documents/Research/Guatemala/guat_obia/felz_model"
-    model = pickle.load(open(model_path, "rb"))
-    print(model)
+#    model_path = "/home/nate/Documents/Research/Guatemala/guat_obia/felz_model"
+#    model = pickle.load(open(model_path, "rb"))
+#    print(model)
     
     image_path = "/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/"
     

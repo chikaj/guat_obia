@@ -15,7 +15,7 @@ from glob import glob
 import numpy as np
 from collections import OrderedDict
 from rasterstats import zonal_stats
-from skimage.segmentation import slic, felzenszwalb, quickshift
+#from skimage.segmentation import slic, felzenszwalb, quickshift
 from skimage.measure import regionprops, label
 from skimage.filters import sobel
 from skimage.morphology import disk
@@ -153,71 +153,72 @@ def bil_to_bip(image):
     return  image.transpose(0, 2, 1)
 
 
-def slic_segmentation(image, mask):
-    """
-    Segment the image.
+#def slic_segmentation(image, mask):
+#    """
+#    Segment the image.
+#
+#    Segment the image using the slic algorithm (from sklearn.segmentation).
+#
+#    Parameters
+#    ----------
+#    image: numpy.array
+#        A rasterio-style image. Obtained and transformed by:
+#        src.read(masked=True).transpose(1, 2, 0)
+#
+#    mask: numpy.array
+#        A rasterio-style mask. Obtained by src.read_masks(1)
+#        This function doesn't do anything with mask at the moment.
+#        This function assumes image has, and is read with, a mask.
+#
+#    Returns
+#    -------
+#    numpy.array
+#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
+#        so it's ready to be written by rasterio
+#
+#    """
+#    img = image[0:3].transpose(1, 2, 0)
+#    segs = slic(img, n_segments=5000, compactness=1, slic_zero=False)
+#    mask[mask == 255] = 1
+#    output = segs * mask[np.newaxis, :]
+#
+#    return label(output)
+#
+#
+#def slic_zero_segmentation(image, mask):
+#    """
+#    Segment the image.
+#
+#    Segment the image using the slic-0 algorithm (from sklearn.segmentation).
+#
+#    Parameters
+#    ----------
+#    image: numpy.array
+#        A rasterio-style image. Obtained and transformed by:
+#        src.read(masked=True).transpose(1, 2, 0)
+#
+#    mask: numpy.array
+#        A rasterio-style mask. Obtained by src.read_masks(1)
+#        This function doesn't do anything with mask at the moment.
+#        This function assumes image has, and is read with, a mask.
+#
+#    Returns
+#    -------
+#    numpy.array
+#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
+#        so it's ready to be written by rasterio
+#
+#    """
+#    img = image[0:3].transpose(1, 2, 0)
+#    segs = slic(img, n_segments=2500, compactness=0.1, sigma=5, slic_zero=True)
+#    mask[mask == 255] = 1
+#    output = segs * mask[np.newaxis, :]
+#
+#    return label(output)
 
-    Segment the image using the slic algorithm (from sklearn.segmentation).
 
-    Parameters
-    ----------
-    image: numpy.array
-        A rasterio-style image. Obtained and transformed by:
-        src.read(masked=True).transpose(1, 2, 0)
-
-    mask: numpy.array
-        A rasterio-style mask. Obtained by src.read_masks(1)
-        This function doesn't do anything with mask at the moment.
-        This function assumes image has, and is read with, a mask.
-
-    Returns
-    -------
-    numpy.array
-        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-        so it's ready to be written by rasterio
-
-    """
-    img = image[0:3].transpose(1, 2, 0)
-    segs = slic(img, n_segments=5000, compactness=1, slic_zero=False)
-    mask[mask == 255] = 1
-    output = segs * mask[np.newaxis, :]
-
-    return label(output)
-
-
-def slic_zero_segmentation(image, mask):
-    """
-    Segment the image.
-
-    Segment the image using the slic-0 algorithm (from sklearn.segmentation).
-
-    Parameters
-    ----------
-    image: numpy.array
-        A rasterio-style image. Obtained and transformed by:
-        src.read(masked=True).transpose(1, 2, 0)
-
-    mask: numpy.array
-        A rasterio-style mask. Obtained by src.read_masks(1)
-        This function doesn't do anything with mask at the moment.
-        This function assumes image has, and is read with, a mask.
-
-    Returns
-    -------
-    numpy.array
-        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-        so it's ready to be written by rasterio
-
-    """
-    img = image[0:3].transpose(1, 2, 0)
-    segs = slic(img, n_segments=2500, compactness=0.1, sigma=5, slic_zero=True)
-    mask[mask == 255] = 1
-    output = segs * mask[np.newaxis, :]
-
-    return label(output)
-
-def felz_segmentation(src=None, bands=[1,2,3], image=None, mask=None,
-                      modal_radius=None, sieve_size=250):
+def segmentation(model=None, params=None, src=None, bands=[1,2,3], image=None,
+                 mask=None, modal_radius=None, sieve_size=250):
     """
     Segment the image.
 
@@ -273,8 +274,7 @@ def felz_segmentation(src=None, bands=[1,2,3], image=None, mask=None,
         img = bsq_to_bip(image)
         mask[mask > 255] = 1
     
-    output = felzenszwalb(img, scale=10.0, sigma=2,
-                          min_size=5000).astype('int32')
+    output = model(img, **params).astype('int32')
 
     while np.ndarray.min(output) < 1:
         output += 1
@@ -292,37 +292,113 @@ def felz_segmentation(src=None, bands=[1,2,3], image=None, mask=None,
     return output
 
 
-def quickshift_segmentation(image, mask):
-    """
-    Segment the image.
-
-    Segment the image using the quickshift algorithm
-    (from sklearn.segmentation).
-
-    Parameters
-    ----------
-    image: numpy.array
-        A rasterio-style image. Obtained and transformed by:
-        src.read(masked=True).transpose(1, 2, 0)
-
-    mask: numpy.array
-        A rasterio-style mask. Obtained by src.read_masks(1)
-        This function doesn't do anything with mask at the moment.
-        This function assumes image has, and is read with, a mask.
-
-    Returns
-    -------
-    numpy.array
-        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-        so it's ready to be written by rasterio
-
-    """
-    img = image[0:3].transpose(1, 2, 0)
-    segs = quickshift(img, ratio=0.3, kernel_size= 2, max_dist=50, sigma=5)
-    mask[mask == 255] = 1
-    output = segs * mask[np.newaxis, :]
-
-    return label(output, connectivity=1)
+#def felz_segmentation(src=None, bands=[1,2,3], image=None, mask=None,
+#                      modal_radius=None, sieve_size=250):
+#    """
+#    Segment the image.
+#
+#    Segment the image using the felzenszwalb algorithm
+#    (from sklearn.segmentation).
+#
+#    Parameters
+#    ----------
+#    src: Rasterio datasource
+#        A rasterio-style datasource, created using:
+#        with rasterio.open('path') as src.
+#        There must be at least 3 bands of image data. If there are more than
+#        3 bands, the first three will be used. This parameter is optional.
+#        If it is not provided, then image and transform must be supplied.
+#    
+#    bands: array of integers
+#        The array of 3 bands to read from src as the RGB image for segmentation.
+#        
+#    image: numpy.array
+#        A 3-band (RGB) image used for segmentation. The shape of the image
+#        must be ordered as follows: (bands, rows, columns).
+#        This parameter is optional.
+#    
+#    mask: numpy.array
+#        A 1-band image mask. The shape of the mask must be ordered as follows:
+#        (rows, columns). This parameter is optional.
+#    
+#    transform: rasterio.transform
+#        A raster transform used to convert row/column values to geographic
+#        coordinates. This parameter is optional.
+#    
+#    modal_radius: integer
+#        Integer representing the radius of a raster disk (i.e., circular
+#        roving window). Optional. If not set, no modal filter will be applied.
+#    
+#    sieve_size: integer
+#        An integer representing the smallest number of pixels that will be
+#        included as a unique segment. Segments this size or smaller will be
+#        merged with the neighboring segment with the most pixels. 
+#
+#    Returns
+#    -------
+#    numpy.array
+#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
+#        so it's ready to be written by rasterio
+#
+#    """
+#    if src is not None:
+#        img = bsq_to_bip(src.read(bands, masked=True))
+#        mask = src.read_masks(1)
+#        mask[mask > 0] = 1
+#    else:
+#        img = bsq_to_bip(image)
+#        mask[mask > 255] = 1
+#    
+#    output = felzenszwalb(img, scale=10.0, sigma=2,
+#                          min_size=5000).astype('int32')
+#
+#    while np.ndarray.min(output) < 1:
+#        output += 1
+#
+#    if modal_radius != None:
+#        output = modal(output.astype('int16'), selem=disk(modal_radius),
+#                       mask=mask)
+#
+#    output = features.sieve(output, sieve_size, mask=mask,
+#                            connectivity=8) * mask
+#    output = label(output, connectivity=2)
+#    
+#    output = bip_to_bsq(output[:, :, np.newaxis]) * mask
+#
+#    return output
+#
+#
+#def quickshift_segmentation(image, mask):
+#    """
+#    Segment the image.
+#
+#    Segment the image using the quickshift algorithm
+#    (from sklearn.segmentation).
+#
+#    Parameters
+#    ----------
+#    image: numpy.array
+#        A rasterio-style image. Obtained and transformed by:
+#        src.read(masked=True).transpose(1, 2, 0)
+#
+#    mask: numpy.array
+#        A rasterio-style mask. Obtained by src.read_masks(1)
+#        This function doesn't do anything with mask at the moment.
+#        This function assumes image has, and is read with, a mask.
+#
+#    Returns
+#    -------
+#    numpy.array
+#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
+#        so it's ready to be written by rasterio
+#
+#    """
+#    img = image[0:3].transpose(1, 2, 0)
+#    segs = quickshift(img, ratio=0.3, kernel_size= 2, max_dist=50, sigma=5)
+#    mask[mask == 255] = 1
+#    output = segs * mask[np.newaxis, :]
+#
+#    return label(output, connectivity=1)
 
 
 def get_prop(props, label):
