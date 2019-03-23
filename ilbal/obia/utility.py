@@ -12,10 +12,6 @@ import fiona
 import rasterio
 
 
-def is_working():
-    print("utility.py is working!")
-
-
 training_data = {
     'farming': [
         'new_IMG_3451',

@@ -15,15 +15,10 @@ from glob import glob
 import numpy as np
 from collections import OrderedDict
 from rasterstats import zonal_stats
-#from skimage.segmentation import slic, felzenszwalb, quickshift
 from skimage.measure import regionprops, label
 from skimage.filters import sobel
 from skimage.morphology import disk
 from skimage.filters.rank import modal
-
-
-def is_working():
-    print("data_preparation.py is working!")
 
 
 def shift_images(input_directory_path, output_directory_path):
@@ -153,86 +148,29 @@ def bil_to_bip(image):
     return  image.transpose(0, 2, 1)
 
 
-#def slic_segmentation(image, mask):
-#    """
-#    Segment the image.
-#
-#    Segment the image using the slic algorithm (from sklearn.segmentation).
-#
-#    Parameters
-#    ----------
-#    image: numpy.array
-#        A rasterio-style image. Obtained and transformed by:
-#        src.read(masked=True).transpose(1, 2, 0)
-#
-#    mask: numpy.array
-#        A rasterio-style mask. Obtained by src.read_masks(1)
-#        This function doesn't do anything with mask at the moment.
-#        This function assumes image has, and is read with, a mask.
-#
-#    Returns
-#    -------
-#    numpy.array
-#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-#        so it's ready to be written by rasterio
-#
-#    """
-#    img = image[0:3].transpose(1, 2, 0)
-#    segs = slic(img, n_segments=5000, compactness=1, slic_zero=False)
-#    mask[mask == 255] = 1
-#    output = segs * mask[np.newaxis, :]
-#
-#    return label(output)
-#
-#
-#def slic_zero_segmentation(image, mask):
-#    """
-#    Segment the image.
-#
-#    Segment the image using the slic-0 algorithm (from sklearn.segmentation).
-#
-#    Parameters
-#    ----------
-#    image: numpy.array
-#        A rasterio-style image. Obtained and transformed by:
-#        src.read(masked=True).transpose(1, 2, 0)
-#
-#    mask: numpy.array
-#        A rasterio-style mask. Obtained by src.read_masks(1)
-#        This function doesn't do anything with mask at the moment.
-#        This function assumes image has, and is read with, a mask.
-#
-#    Returns
-#    -------
-#    numpy.array
-#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-#        so it's ready to be written by rasterio
-#
-#    """
-#    img = image[0:3].transpose(1, 2, 0)
-#    segs = slic(img, n_segments=2500, compactness=0.1, sigma=5, slic_zero=True)
-#    mask[mask == 255] = 1
-#    output = segs * mask[np.newaxis, :]
-#
-#    return label(output)
-
-
 def segmentation(model=None, params=None, src=None, bands=[1,2,3], image=None,
                  mask=None, modal_radius=None, sieve_size=250):
     """
     Segment the image.
 
-    Segment the image using the felzenszwalb algorithm
-    (from sklearn.segmentation).
+    Segment the image using an algorithm from sklearn.segmentation.
 
     Parameters
     ----------
+    model: sklearn.segmentation model
+        A model from sklearn.segmentation (e.g., slic, slic0, felzenswalb)
+
+    params: sklearn.segmentation model parameters
+        The unique parameters for the selected segmentation algorithm. Will be
+        passed to the model as the kwargs argument.
+
     src: Rasterio datasource
         A rasterio-style datasource, created using:
         with rasterio.open('path') as src.
         There must be at least 3 bands of image data. If there are more than
-        3 bands, the first three will be used. This parameter is optional.
-        If it is not provided, then image and transform must be supplied.
+        3 bands, the first three will be used (see 'bands' parameter). This 
+        parameter is optional. **If it is not provided, then image and transform
+        must be supplied.--really?? Not any more, right?**
     
     bands: array of integers
         The array of 3 bands to read from src as the RGB image for segmentation.
@@ -245,10 +183,6 @@ def segmentation(model=None, params=None, src=None, bands=[1,2,3], image=None,
     mask: numpy.array
         A 1-band image mask. The shape of the mask must be ordered as follows:
         (rows, columns). This parameter is optional.
-    
-    transform: rasterio.transform
-        A raster transform used to convert row/column values to geographic
-        coordinates. This parameter is optional.
     
     modal_radius: integer
         Integer representing the radius of a raster disk (i.e., circular
@@ -292,122 +226,13 @@ def segmentation(model=None, params=None, src=None, bands=[1,2,3], image=None,
     return output
 
 
-#def felz_segmentation(src=None, bands=[1,2,3], image=None, mask=None,
-#                      modal_radius=None, sieve_size=250):
-#    """
-#    Segment the image.
-#
-#    Segment the image using the felzenszwalb algorithm
-#    (from sklearn.segmentation).
-#
-#    Parameters
-#    ----------
-#    src: Rasterio datasource
-#        A rasterio-style datasource, created using:
-#        with rasterio.open('path') as src.
-#        There must be at least 3 bands of image data. If there are more than
-#        3 bands, the first three will be used. This parameter is optional.
-#        If it is not provided, then image and transform must be supplied.
-#    
-#    bands: array of integers
-#        The array of 3 bands to read from src as the RGB image for segmentation.
-#        
-#    image: numpy.array
-#        A 3-band (RGB) image used for segmentation. The shape of the image
-#        must be ordered as follows: (bands, rows, columns).
-#        This parameter is optional.
-#    
-#    mask: numpy.array
-#        A 1-band image mask. The shape of the mask must be ordered as follows:
-#        (rows, columns). This parameter is optional.
-#    
-#    transform: rasterio.transform
-#        A raster transform used to convert row/column values to geographic
-#        coordinates. This parameter is optional.
-#    
-#    modal_radius: integer
-#        Integer representing the radius of a raster disk (i.e., circular
-#        roving window). Optional. If not set, no modal filter will be applied.
-#    
-#    sieve_size: integer
-#        An integer representing the smallest number of pixels that will be
-#        included as a unique segment. Segments this size or smaller will be
-#        merged with the neighboring segment with the most pixels. 
-#
-#    Returns
-#    -------
-#    numpy.array
-#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-#        so it's ready to be written by rasterio
-#
-#    """
-#    if src is not None:
-#        img = bsq_to_bip(src.read(bands, masked=True))
-#        mask = src.read_masks(1)
-#        mask[mask > 0] = 1
-#    else:
-#        img = bsq_to_bip(image)
-#        mask[mask > 255] = 1
-#    
-#    output = felzenszwalb(img, scale=10.0, sigma=2,
-#                          min_size=5000).astype('int32')
-#
-#    while np.ndarray.min(output) < 1:
-#        output += 1
-#
-#    if modal_radius != None:
-#        output = modal(output.astype('int16'), selem=disk(modal_radius),
-#                       mask=mask)
-#
-#    output = features.sieve(output, sieve_size, mask=mask,
-#                            connectivity=8) * mask
-#    output = label(output, connectivity=2)
-#    
-#    output = bip_to_bsq(output[:, :, np.newaxis]) * mask
-#
-#    return output
-#
-#
-#def quickshift_segmentation(image, mask):
-#    """
-#    Segment the image.
-#
-#    Segment the image using the quickshift algorithm
-#    (from sklearn.segmentation).
-#
-#    Parameters
-#    ----------
-#    image: numpy.array
-#        A rasterio-style image. Obtained and transformed by:
-#        src.read(masked=True).transpose(1, 2, 0)
-#
-#    mask: numpy.array
-#        A rasterio-style mask. Obtained by src.read_masks(1)
-#        This function doesn't do anything with mask at the moment.
-#        This function assumes image has, and is read with, a mask.
-#
-#    Returns
-#    -------
-#    numpy.array
-#        A numpy array arranged as rasterio would read it (bands=1, rows, cols)
-#        so it's ready to be written by rasterio
-#
-#    """
-#    img = image[0:3].transpose(1, 2, 0)
-#    segs = quickshift(img, ratio=0.3, kernel_size= 2, max_dist=50, sigma=5)
-#    mask[mask == 255] = 1
-#    output = segs * mask[np.newaxis, :]
-#
-#    return label(output, connectivity=1)
-
-
 def get_prop(props, label):
     for p in props:
         if p.label == label:
             return p
 
 
-def vectorize(src=None, image=None, transform=None):
+def vectorize(src=None, image=None, transform=None, crs=None):
     """
     Raster-to-Vector conversion.
     
@@ -430,6 +255,10 @@ def vectorize(src=None, image=None, transform=None):
     transform: rasterio.transform
         A raster transform used to convert row/column values to geographic
         coordinates. This parameter is optional.
+
+    crs: rasterio.crs
+        A proj4 string representing the coordinate reference system. 
+        This parameter is optional.
     
     Returns
     -------
@@ -439,6 +268,7 @@ def vectorize(src=None, image=None, transform=None):
     if src is not None:
         img = src.read(1, masked=True)
         transform = src.transform
+        crs = src.crs
     else:
         img = image[0].astype(np.int32)
         
@@ -452,7 +282,9 @@ def vectorize(src=None, image=None, transform=None):
                     'type': 'Feature'}
             records.append(item)
 
-    return GeoDataFrame.from_features(records)
+    vec = GeoDataFrame.from_features(records)
+    vec.crs = crs
+    return vec
 
 
 def _geometry_value_pairs(gdf, value_column):
@@ -529,8 +361,8 @@ def add_shape_properties(classified_image, gdf, attributes=['area', 'perimeter']
         A GeoDataFrame (vector) with object boundaries corresponding to image
         regions. Image attributes will be assigned to each vector object.
     
-    shapes: list of strings
-        Shapes is a list of strings where each string is a type of shape to
+    attributes: list of strings
+        attributes is a list of strings where each string is a type of shape to
         calculate for each polygon. Possible shapes include: area, bbox_area,
         centroid, convex_area, eccentricity, equivalent_diamter, euler_number,
         extent, filled_area, label, maxor_axis_length, max_intensity,
@@ -566,8 +398,8 @@ def add_shape_properties(classified_image, gdf, attributes=['area', 'perimeter']
 
 
 def add_zonal_properties(src=None, bands=[1,2,3], image=None, transform=None,
-                            band_names=['red','green','blue'], stats=['mean'],
-                            gdf=None):
+                         band_names=['red','green','blue'], stats=['mean'],
+                         gdf=None):
     """
     Adds zonal properties to a GeoDataFrame.
     
@@ -600,10 +432,13 @@ def add_zonal_properties(src=None, bands=[1,2,3], image=None, transform=None,
     
     stats: list of strings
         The list of zonal statistics to calculate for each geographic object.
+        The full list of stats is: ['sum', 'std', 'median', 'majority',
+        'minority', 'unique', 'range', 'nodata', 'percentile_<q>']. Replace
+        <q> with a value between 1 and 100, inclusive.
     
     gdf: GeoDataFrame
         The GeoDataFrame to be updated with zonal statistics. The number of
-        columns is equal to len(bands) * len(stats). 
+        columns that will be added is equal to len(bands) * len(stats). 
     
     Returns
     -------
@@ -615,11 +450,12 @@ def add_zonal_properties(src=None, bands=[1,2,3], image=None, transform=None,
         transform = src.transform
 
     if len(image) != len(band_names): 
-        print("The number of image bands must equal the number of bands passed.")
+        print("The number of bands must equal the number of bands_names.")
         return None
 
-    for b, p in enumerate(band_names):
-        raster_stats = zonal_stats(gdf, image[b], stats=stats, affine=transform)
+    for band, name in enumerate(band_names):
+        raster_stats = zonal_stats(gdf, image[band], stats=stats, 
+                                   affine=transform)
         
         fields = [[] for i in range(len(stats))]
         labels = []
@@ -631,12 +467,12 @@ def add_zonal_properties(src=None, bands=[1,2,3], image=None, transform=None,
                 fields[j].append(rs[r])
         
         for i, l in enumerate(labels):
-            gdf.insert(len(gdf.columns)-1, p + "_" + l, fields[i])
+            gdf.insert(len(gdf.columns)-1, name + "_" + l, fields[i])
 
     return gdf
 
 
-def edge_detect(src=None, band=1, image=None, mask=None):
+def sobel_edge_detect(src=None, band=1, image=None, mask=None):
     """
     Performs a Sobel edge detection.
 
@@ -678,65 +514,3 @@ def edge_detect(src=None, band=1, image=None, mask=None):
         
     edges = sobel(image)
     return bip_to_bsq(edges[:, :, np.newaxis]) * mask
-
-
-#def prep_for_slic(image, mask, transform, crs_dict):
-#    rout = slic_segmentation(image, mask)
-#    vout = ras2vec(rout, transform)
-#    for b, p in zip(range(0, len(image[0:3])), ['red', 'green', 'blue']):
-#        add_zonal_fields(vector=vout, raster=image, band=b, affine=transform,
-#                         prefix=p, stats=['mean'])
-#    edges = edge_detect(image[0])
-#    add_zonal_fields(vector=vout, raster=edges, band=0,
-#                     affine=transform, prefix='sobel',
-#                     stats=['mean', 'std', 'sum'])
-#    
-#    return vout
-#
-#
-#def prep_for_slic_zero(image, mask, transform, crs_dict):
-#    rout = slic_zero_segmentation(image, mask)
-#    vout = ras2vec(rout, transform)
-#    for b, p in zip(range(0, len(image[0:3])), ['red', 'green', 'blue']):
-#        add_zonal_fields(vector=vout, raster=image, band=b, affine=transform,
-#                         prefix=p, stats=['mean'])
-#    edges = edge_detect(image[0])
-#    add_zonal_fields(vector=vout, raster=edges, band=0,
-#                     affine=transform, prefix='sobel',
-#                     stats=['mean', 'std', 'sum'])
-#    
-#    return vout
-#
-#
-#def prep_for_felz(src):
-#    rout = felz_segmentation(src, modal_radius=3, sieve_size=249)
-#    vout = ras2vec(rout, src.transform)
-#    vout = add_shape_properties(rout, vout)
-#    vout = add_spectral_properties(src, ['red', 'green', 'blue'], vout)
-#    
-##    vout.to_file("sieved.shp")
-#
-#    image = src.read(masked=True)[0:3]
-#    for b, p in zip(range(len(image)), ['red', 'green', 'blue']):
-#        add_zonal_fields(vector=vout, raster=image, band=b, affine=src.transform,
-#                         prefix=p, stats=['mean'])
-#    edges = edge_detect(image[0])
-#    add_zonal_fields(vector=vout, raster=edges, band=0,
-#                     affine=src.transform, prefix='sobel',
-#                     stats=['mean', 'std', 'sum'])
-#    
-#    return vout
-#
-#
-#def prep_for_quickshift(image, mask, transform, crs_dict):
-#    rout = quickshift_segmentation(image, mask)
-#    vout = ras2vec(rout, transform)
-#    for b, p in zip(range(0, len(image[0:3])), ['red', 'green', 'blue']):
-#        add_zonal_fields(vector=vout, raster=image, band=b, affine=transform,
-#                         prefix=p, stats=['mean'])
-#    edges = edge_detect(image[0])
-#    add_zonal_fields(vector=vout, raster=edges, band=0,
-#                     affine=transform, prefix='sobel',
-#                     stats=['mean', 'std', 'sum'])
-#    
-#    return vout

@@ -4,6 +4,7 @@ Loop through the images to classify them.
 
 @author: Nate Currit
 """
+import sys
 from ilbal.obia import data_preparation as dp, classify as cl
 from ilbal.obia import verification as v, utility
 #import numpy as np
@@ -39,7 +40,6 @@ def felz(filename):
                                        gdf=vout)
         # perform clustering (k-means?) on SLIC0 segments
         t = vout.drop(['dn', 'geometry'], axis=1)
-        clusters = DBSCAN().fit_predict(t)
         # re-do zonal properties for spectral bands, then continue
         vout = dp.add_shape_properties(rout, vout, ['area', 'perimeter',
                                                     'eccentricity', 
@@ -58,22 +58,29 @@ def felz(filename):
         return vout
 
 
-def main():
+def main(argv):
 #    model_path = "/home/nate/Documents/Research/Guatemala/guat_obia/felz_model"
 #    model = pickle.load(open(model_path, "rb"))
 #    print(model)
     
-    image_path = "/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/"
+    if argv[1] not in ('train', 'test', 'verify'):
+        sys.exit("Requires an argument from the following list: train, test, verify.")
     
+    location = "local" # "local" or "txgisci"
+    if location == "local":
+        image_path = "/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/"
+    else:
+        image_path = "/data1/Guatemala/PNLT2015/"
+        
     image_list = glob(image_path + "*.tif")
     
-    image_list = ['/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/new_IMG_3434.tif',
-                  '/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/new_IMG_3435.tif',
-                  '/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/new_IMG_3436.tif']
+    image_list = [image_path + 'new_IMG_3434.tif',
+                  image_path + 'new_IMG_3435.tif',
+                  image_path + 'new_IMG_3436.tif']
     
-#    image_list = ['/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/new_IMG_3435.tif']
+#    image_list = [image_path + 'new_IMG_3435.tif']
     
-    verif = '/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/verification.shp'
+    verif = image_path + 'verification.shp'
 
     # build training dataset
     for i, image in enumerate(image_list):
@@ -122,4 +129,4 @@ if __name__ == "__main__":
     import os
     if not os.path.exists("output"):
         os.makedirs("output")
-    main()
+    main(sys.argv)
