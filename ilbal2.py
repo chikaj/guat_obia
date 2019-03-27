@@ -17,6 +17,7 @@ from skimage.segmentation import slic#, felzenszwalb
 from skimage.future import graph
 from multiprocessing import Process, Queue
 import time
+from math import ceil
 
 
 def segment(filename):
@@ -34,21 +35,21 @@ def segment(filename):
 #                               modal_radius=3)
         rout = dp.segmentation(model=slic, params=slic_params, src=src,
                                modal_radius=3)
-        ##### temporary
-        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
-        vout.to_file("output/original_segs.shp")
-        #####
+#        ##### temporary
+#        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
+#        vout.to_file("output/original_segs.shp")
+#        #####
 
         # Region Agency Graph to merge segments
         orig = dp.bsq_to_bip(src.read([1, 2, 3], masked=True))
         labels = (dp.bsq_to_bip(rout))[:, :, 0]
 
-#        rag = graph.rag_mean_color(orig, labels, mode='similarity')
-#        rout = graph.cut_normalized(labels, rag)
-#
-#        # Vectorize the RAG segments
-#        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
-#        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
+        rag = graph.rag_mean_color(orig, labels, mode='similarity')
+        rout = graph.cut_normalized(labels, rag)
+
+        # Vectorize the RAG segments
+        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
+        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
 
         # Add spectral properties.
         vout = dp.add_zonal_properties(src=src, bands=[1, 2, 3],
@@ -75,10 +76,10 @@ def segment(filename):
         ###################
         # Temporary code to write to vector and raster formats...
         # for checking output. Akin to using print statements to debug.
-        vout.to_file("output/working.shp")
-#        out_raster = dp.rasterize(vout, 'dn', src.shape, src.transform)
-#        utility.write_geotiff(out_raster[np.newaxis, :], 'rasterized.tif',
-#                              src, count=1, dtypes=('uint8'))
+#        vout.to_file("output/working.shp")
+        #out_raster = dp.rasterize(vout, 'dn', src.shape, src.transform)
+        #utility.write_geotiff(out_raster[np.newaxis, :], 'rasterized.tif',
+        #                       src, count=1, dtypes=('uint8'))
         ###################
 
         return vout
@@ -117,16 +118,27 @@ if __name__ == "__main__":
     image_list = glob(training_path + "training_new_IMG_*.tif")
     
     ##### Set the number of cores #####
-    cores = 60
+    cores = 3
     partition = []
-
-    size = round(len(image_list) / cores)    
+    image_list = image_list[:4]
+    size = ceil(len(image_list) / cores)    
     for id, core in enumerate(range(cores)):
         partition.append(image_list[id * size:(id + 1) * size])
 
+    startTime = time.time()
+
     vout = gpd.GeoDataFrame()
     for part in partition:
-        vout = vout.append(train(part))
+        vout = vout.append(train(part)) 
+
+    vout.to_file("output/full_training.shp")
+
+    endTime = time.time()
+    #calculate the total time it took to complete the work
+    workTime =  endTime - startTime
+     
+    #print results
+    print("The job took " + str(workTime) + " seconds to complete")
     
 #    #mark the start time
 #    startTime = time.time()
