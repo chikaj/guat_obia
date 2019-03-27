@@ -11,13 +11,12 @@ import rasterio
 import numpy as np
 import geopandas as gpd
 from geopandas import GeoDataFrame as gdf
-#import pandas as pd
-#from skimage.filters import sobel
 import pickle
 from glob import glob
-
-from skimage.segmentation import felzenszwalb, slic
+from skimage.segmentation import slic#, felzenszwalb
 from skimage.future import graph
+from multiprocessing import Process, Queue
+import time
 
 
 def segment(filename):
@@ -26,7 +25,9 @@ def segment(filename):
 #                       'sigma': 2,
 #                       'min_size': 5000}
 
-        slic_params = {'slic_zero': True}
+        slic_params = {'compactness': 20,
+                       'n_segments': 200,
+                       'multichannel': True}
 
         # Segment the image.
 #        rout = dp.segmentation(model=felzenszwalb, params=felz_params, src=src,
@@ -34,20 +35,20 @@ def segment(filename):
         rout = dp.segmentation(model=slic, params=slic_params, src=src,
                                modal_radius=3)
         ##### temporary
-        vout = dp.vectorize(image=rout, transform=src.transform)
+        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
         vout.to_file("output/original_segs.shp")
         #####
 
         # Region Agency Graph to merge segments
         orig = dp.bsq_to_bip(src.read([1, 2, 3], masked=True))
-        rag_segs = (dp.bsq_to_bip(rout))[:, :, 0]
+        labels = (dp.bsq_to_bip(rout))[:, :, 0]
 
-        g = graph.rag_mean_color(orig, rag_segs)
-        rout = graph.cut_normalized(rag_segs, g)
-
-        # Vectorize the RAG segments
-        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
-        vout = dp.vectorize(image=rout, transform=src.transform)
+#        rag = graph.rag_mean_color(orig, labels, mode='similarity')
+#        rout = graph.cut_normalized(labels, rag)
+#
+#        # Vectorize the RAG segments
+#        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
+#        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
 
         # Add spectral properties.
         vout = dp.add_zonal_properties(src=src, bands=[1, 2, 3],
@@ -83,134 +84,88 @@ def segment(filename):
         return vout
 
 
-def train():    
-    location = "local" # "local" or "txgisci"
-    if location == "local":
-        training_path = "/home/nate/Documents/Research/Guatemala/training_data/"
-    else:
-        training_path = "/data1/Guatemala/PNLT2015/need/to/add/training/data"
-        
-    image_list = glob(training_path + "training_new_IMG_*.tif")
-        
+def train(image_list):    
     # build training Geodataframe
+    vout = gpd.GeoDataFrame()
     for i, image in enumerate(image_list):
-        if i == 0:
-            vout = segment(image)
-        else:
-            vout = vout.append(segment(image))
+#        if i == 0:
+#            vout = segment(image)
+#        else:
+        vout = vout.append(segment(image))
 
-    # select objects intersecting training polygons from...
-    training_polys = "/home/nate/Documents/Research/Guatemala/geobia_training/training_samples2.shp"
-    vpoly = gpd.read_file(training_polys)
-    
-    # old stuff...I'm working on it...
-    for i in image_list:
-        vout = felz(i)
-
-        gdf.to_file(vout, i.replace(".tif", "_segs_f.shp"))
-    
-        fields = ['count', 'perimeter', 'eccentrici', 'equal_diam',
-                  'major_axis', 'minor_axis', 'orientatio', 'red_mean',
-                  'green_mean', 'blue_mean', 'sobel_mean', 'sobel_std']
-#        tmp = vec.loc[:, fields]
-        tmp = vout[fields]
-        to_predict = tmp.values
-        predictions = cl.predict(model, to_predict)
-        
-        vout['pred'] = predictions
-        vout.crs = src.crs.to_dict()
-
-        verification = gpd.read_file(verif)
-        full = gpd.sjoin(vout, verification, how="inner", op="within")
-        
-        cls = full['class_id'].values
-        prd = full['pred'].values
-        o, p, u, k = v.accuracy(v.cross_tabulation(cls, prd, 11))
-        
-        print("--------------------------------------------------")
-        print()
-        print("For image " + i + ", the accuracy metrics are:")
-        print("\tOverall Accuracy: " + str(o) + "%")
-        print("\tProducers Accuracy: " + str(p) + "%")
-        print("\tUsers Accuracy: " + str(u) + "%")
-        print("\tKappa Coefficient: " + str(k) + "%")
-        print()
-        
-        gdf.to_file(full, i.replace(".tif", "_verify_segs.shp"))
+    return vout
 
 
-def original_main():
-#    model_path = "/home/nate/Documents/Research/Guatemala/guat_obia/felz_model"
-#    model = pickle.load(open(model_path, "rb"))
-#    print(model)
+def doWork(list, q):
+    output = train(list)
     
-#    if argv[1] not in ('train', 'test', 'verify'):
-#        sys.exit("Requires an argument from the following list: train, test, verify.")
-    
-    location = "local" # "local" or "txgisci"
-    if location == "local":
-        training_path = "/home/nate/Documents/Research/Guatemala/training_data/"
-#        image_path = "/home/nate/Documents/Research/Guatemala/photos/2015/PNLT/output2/"
-    else:
-        training_path = "/data1/Guatemala/PNLT2015/"
-        
-#    image_list = glob(image_path + "*.tif")
-    
-    image_list = [training_path + 'new_IMG_3434.tif',
-                  training_path + 'new_IMG_3435.tif',
-                  training_path + 'new_IMG_3436.tif']
-    
-#    /home/nate/Documents/Research/Guatemala/geobia_training/training_samples2.shp
-        
-#    verif = image_path + 'verification.shp'
-
-    # build training dataset
-    for i, image in enumerate(image_list):
-        if i == 0:
-            vout = felz(image)
-        else:
-            vout = vout.append(felz(image))        
-    
-    # old stuff...I'm working on it...
-    for i in image_list:
-        vout = felz(i)
-
-        gdf.to_file(vout, i.replace(".tif", "_segs_f.shp"))
-    
-        fields = ['count', 'perimeter', 'eccentrici', 'equal_diam',
-                  'major_axis', 'minor_axis', 'orientatio', 'red_mean',
-                  'green_mean', 'blue_mean', 'sobel_mean', 'sobel_std']
-#        tmp = vec.loc[:, fields]
-        tmp = vout[fields]
-        to_predict = tmp.values
-        predictions = cl.predict(model, to_predict)
-        
-        vout['pred'] = predictions
-        vout.crs = src.crs.to_dict()
-
-        verification = gpd.read_file(verif)
-        full = gpd.sjoin(vout, verification, how="inner", op="within")
-        
-        cls = full['class_id'].values
-        prd = full['pred'].values
-        o, p, u, k = v.accuracy(v.cross_tabulation(cls, prd, 11))
-        
-        print("--------------------------------------------------")
-        print()
-        print("For image " + i + ", the accuracy metrics are:")
-        print("\tOverall Accuracy: " + str(o) + "%")
-        print("\tProducers Accuracy: " + str(p) + "%")
-        print("\tUsers Accuracy: " + str(u) + "%")
-        print("\tKappa Coefficient: " + str(k) + "%")
-        print()
-        
-        gdf.to_file(full, i.replace(".tif", "_verify_segs.shp"))
+    q.put(output)
 
 
 if __name__ == "__main__":
     import os
     if not os.path.exists("output"):
         os.makedirs("output")
-    train()
+    
+    ##### Set the location #####
+    location = "local" # "local" or "txgisci"
+    if location == "local":
+        training_path = "/home/nate/Documents/Research/Guatemala/training/"
+    else:
+        training_path = "/data1/guatemala/training/"
+        
+    image_list = glob(training_path + "training_new_IMG_*.tif")
+    
+    ##### Set the number of cores #####
+    cores = 60
+    partition = []
+
+    size = round(len(image_list) / cores)    
+    for id, core in enumerate(range(cores)):
+        partition.append(image_list[id * size:(id + 1) * size])
+
+    vout = gpd.GeoDataFrame()
+    for part in partition:
+        vout = vout.append(train(part))
+    
+#    #mark the start time
+#    startTime = time.time()
+#    #create a Queue to share results
+#    q = Queue()
+#    #create sub-processes to do the work
+#    for part in partition:
+#        p = Process(target=doWork, args=(part, q))
+#        p.start()
+#     
+#    results = []
+#    #grab values from the queue, one for each process
+#    for c in range(cores):
+#        #set block=True to block until we get a result
+#        results.append(q.get(True))
+#     
+#    #append all results together
+#    vout = results[0]
+#    for c in range(cores) - 2:
+#        c += 1
+#        vout.append(results[c])
+#     
+##    p1.join()
+##    p2.join()
+##    p3.join()
+##    p4.join()
+##    p5.join()
+##    p6.join()
+##    p7.join()
+##    p8.join()
+#             
+#    #mark the end time
+#    endTime = time.time()
+#    #calculate the total time it took to complete the work
+#    workTime =  endTime - startTime
+#     
+#    #print results
+#    print("The job took " + str(workTime) + " seconds to complete")
+    
+#    train()
 #    test()
 #    verify()
