@@ -35,8 +35,10 @@ def segment(filename):
 #                               modal_radius=3)
         rout = dp.segmentation(model=slic, params=slic_params, src=src,
                                modal_radius=3)
+
 #        ##### temporary
-        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
+        vout = dp.vectorize(image=rout, transform=src.transform,
+                            crs=src.crs.to_proj4())
 #        vout.to_file("output/original_segs.shp")
 #        #####
 
@@ -89,9 +91,6 @@ def train(image_list):
     # build training Geodataframe
     vout = gpd.GeoDataFrame()
     for i, image in enumerate(image_list):
-#        if i == 0:
-#            vout = segment(image)
-#        else:
         vout = vout.append(segment(image))
 
     return vout
@@ -109,14 +108,13 @@ if __name__ == "__main__":
         os.makedirs("output")
 
     ##### Set the location #####
-    location = "txgisci" # "local" or "txgisci"
+    location = "local" # "local" or "txgisci"
     if location == "local":
         training_path = "/home/nate/Documents/Research/Guatemala/training/"
     else:
         training_path = "/data1/guatemala/training/"
 
     image_list = glob(training_path + "training_new_IMG_*.tif")
-
     ##### Set the number of cores #####
     cores = 3
     partition = []
@@ -129,7 +127,7 @@ if __name__ == "__main__":
 
     vout = gpd.GeoDataFrame()
     for part in partition:
-        vout = vout.append(train(part))
+        vout = vout.append(train(part), ignore_index=True)
 
     vout.to_file("output/full_training.shp")
 

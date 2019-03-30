@@ -1,0 +1,11 @@
+name: geo
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - geopandas
+  - scikit-image
+  - scikit-learn
+  - pip:
+    - rasterio
+    - rasterstats

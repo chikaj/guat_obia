@@ -268,7 +268,7 @@ def vectorize(src=None, image=None, transform=None, crs=None):
     if src is not None:
         img = src.read(1, masked=True)
         transform = src.transform
-        crs = src.crs
+        crs = src.crs.to_proj4()
     else:
         img = image[0].astype(np.int32)
         
@@ -374,7 +374,9 @@ def add_shape_properties(classified_image, gdf, attributes=['area', 'perimeter']
     Nothing
         Instead modifies GeoDataFrame in place.
     """    
-    props = regionprops(classified_image)
+#    props = regionprops(classified_image)
+    clim = classified_image[0, :, :]
+    props = regionprops(clim)
     
     attributes = {s: [] for s in attributes}
 
