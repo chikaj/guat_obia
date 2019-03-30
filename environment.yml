@@ -6,6 +6,9 @@ dependencies:
   - geopandas
   - scikit-image
   - scikit-learn
+  - psycopg2
+  - sqlalchemy
+  - geoalchemy2
   - pip:
     - rasterio
     - rasterstats

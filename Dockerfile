@@ -29,4 +29,4 @@ RUN [ “/bin/bash”, “-c”, “source activate geo3” ]
 
 # We set ENTRYPOINT, so while we still use exec mode, we don’t
 # explicitly call /bin/bash
-CMD [ “source activate geo3” ]
+CMD [ “source activate geo” ]

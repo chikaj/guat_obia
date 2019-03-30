@@ -386,7 +386,7 @@ def add_shape_properties(classified_image, gdf, attributes=['area', 'perimeter']
         if p is not None:
             for a in attributes:
                 attributes[a].append(getattr(p, a))
-                
+
     for a in attributes:
         if (a == 'area'):
             gdf.insert(len(gdf.columns)-1, a, gdf.geometry.area)
