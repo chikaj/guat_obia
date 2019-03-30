@@ -51,7 +51,8 @@ def segment(filename):
 
         # Vectorize the RAG segments
         rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
-        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
+        vout = dp.vectorize(image=rout, transform=src.transform,
+                            crs=src.crs.to_proj4())
 
         # Add spectral properties.
         vout = dp.add_zonal_properties(src=src, bands=[1, 2, 3],
