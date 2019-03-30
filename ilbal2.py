@@ -36,22 +36,22 @@ def segment(filename):
         rout = dp.segmentation(model=slic, params=slic_params, src=src,
                                modal_radius=3)
 
-#        ##### temporary
         vout = dp.vectorize(image=rout, transform=src.transform,
                             crs=src.crs.to_proj4())
+#        ##### temporary
 #        vout.to_file("output/original_segs.shp")
 #        #####
 
         # Region Agency Graph to merge segments
-#        orig = dp.bsq_to_bip(src.read([1, 2, 3], masked=True))
-#        labels = (dp.bsq_to_bip(rout))[:, :, 0]
+        orig = dp.bsq_to_bip(src.read([1, 2, 3], masked=True))
+        labels = (dp.bsq_to_bip(rout))[:, :, 0]
 
-#        rag = graph.rag_mean_color(orig, labels, mode='similarity')
-#        rout = graph.cut_normalized(labels, rag)
+        rag = graph.rag_mean_color(orig, labels, mode='similarity')
+        rout = graph.cut_normalized(labels, rag)
 
         # Vectorize the RAG segments
-#        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
-#        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
+        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
+        vout = dp.vectorize(image=rout, transform=src.transform, crs=src.crs)
 
         # Add spectral properties.
         vout = dp.add_zonal_properties(src=src, bands=[1, 2, 3],
