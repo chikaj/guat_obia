@@ -98,14 +98,25 @@ def train(filename):
     connection_string = environ.get('guat_obia_connection_string',
                                     'postgresql://nate:nate@localhost:5432/guat_obia')
     engine = create_engine(connection_string)
+
     # SELECT tables from PostGIS
     segs = gpd.read_postgis('SELECT * FROM training;', engine)
     training_vecs = gpd.read_postgis('SELECT * FROM training_vectors;', engine)
+
     # Spatial join
     training = gpd.sjoin(training_vecs, segs);
     training = training.drop(['dn', 'geometry'], axis=1)
-    model = train(training)
-    pickle(filename, model)
+
+    # Train model
+    model = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
+                   coef0=0.0, decision_function_shape='ovr', degree=3,
+                   gamma=7.694015754766104e-05, kernel='rbf', max_iter=-1,
+                   probability=False, random_state=None, shrinking=True,
+                   tol=0.001, verbose=False)
+    model.fit(X, Y)
+    
+    # Save trained model
+    pickle.dump(model, open(filename, "wb"))
 
 
 def train_classifier(X, Y, output_filename):
@@ -159,6 +170,7 @@ if __name__ == "__main__":
         training_path = "/data1/guatemala/training/"
     ############################
 
+    ##### Segmentation #####
     image_list = sorted(glob(training_path + "training_new_IMG_*.tif"))
 
     startTime = time.time()
@@ -166,10 +178,11 @@ if __name__ == "__main__":
     endTime = time.time()
     print("The segmentation took " + str(endTime - startTime) + " seconds to complete.")
 
-#    startTime = time.time()
-#    train()
-#    endTime = time.time()
-#    print("The training took " + str(endTime - startTime) + " seconds to complete.")
+    ##### Training #####
+    startTime = time.time()
+    train("output/" + datetime + ".svm")
+    endTime = time.time()
+    print("The training took " + str(endTime - startTime) + " seconds to complete.")
 
 #    test()
 #    verify()
