@@ -7,10 +7,10 @@ Loop through the images to classify them.
 from ilbal.obia import data_preparation as dp, classify as cl
 from ilbal.obia import verification as v
 import rasterio
-#import numpy as np
-#import geopandas as gpd
+import numpy as np
+import geopandas as gpd
 #from geopandas import GeoDataFrame as gdf
-#import pickle
+import pickle
 from glob import glob
 from skimage.segmentation import slic#, felzenszwalb
 from skimage.future import graph
@@ -32,14 +32,14 @@ def _segment(filename):
                                modal_radius=3)
 
         # Region Agency Graph to merge segments
-#        orig = dp.bsq_to_bip(src.read([1, 2, 3], masked=True))
-#        labels = (dp.bsq_to_bip(rout))[:, :, 0]
-#
-#        rag = graph.rag_mean_color(orig, labels, mode='similarity')
-#        rout = graph.cut_normalized(labels, rag)
-#
-#        # Vectorize the RAG segments
-#        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
+        orig = dp.bsq_to_bip(src.read([1, 2, 3], masked=True))
+        labels = (dp.bsq_to_bip(rout))[:, :, 0]
+
+        rag = graph.rag_mean_color(orig, labels, mode='similarity')
+        rout = graph.cut_normalized(labels, rag)
+
+        # Vectorize the RAG segments
+        rout = dp.bip_to_bsq(rout[:, :, np.newaxis])
         vout = dp.vectorize(image=rout, transform=src.transform,
                             crs=src.crs.to_proj4())
 
@@ -48,8 +48,6 @@ def _segment(filename):
                                        band_names=['red', 'green', 'blue'],
                                        stats=['mean','min','max','std'],
                                        gdf=vout)
-
-#        t = vout.drop(['dn', 'geometry'], axis=1) # may be used later...
 
         # Add shape properties.
         vout = dp.add_shape_properties(rout, vout, ['area', 'perimeter',
@@ -89,6 +87,25 @@ def segment(image_list):
         vout.drop('geometry', 1, inplace=True)
         vout.to_sql('training', engine, 'nate', if_exists='append', index=False,
                     dtype={'geom': Geometry('POLYGON', srid=9001)})
+
+
+def _train(training):
+    pass
+
+
+def train(filename):
+    # open connection to database
+    connection_string = environ.get('guat_obia_connection_string',
+                                    'postgresql://nate:nate@localhost:5432/guat_obia')
+    engine = create_engine(connection_string)
+    # SELECT tables from PostGIS
+    segs = gpd.read_postgis('SELECT * FROM training;', engine)
+    training_vecs = gpd.read_postgis('SELECT * FROM training_vectors;', engine)
+    # Spatial join
+    training = gpd.sjoin(training_vecs, segs);
+    training = training.drop(['dn', 'geometry'], axis=1)
+    model = train(training)
+    pickle(filename, model)
 
 
 if __name__ == "__main__":
