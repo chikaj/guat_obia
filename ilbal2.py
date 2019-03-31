@@ -9,16 +9,16 @@ from ilbal.obia import verification as v
 import rasterio
 import numpy as np
 import geopandas as gpd
-#from geopandas import GeoDataFrame as gdf
 import pickle
 from glob import glob
 from skimage.segmentation import slic#, felzenszwalb
 from skimage.future import graph
-#import psycopg2
 from sqlalchemy import create_engine
 from geoalchemy2 import Geometry, WKTElement
 import time
 from os import environ
+from sklearn import svm
+
 
 
 def _segment(filename):
@@ -108,6 +108,44 @@ def train(filename):
     pickle(filename, model)
 
 
+def train_classifier(X, Y, output_filename):
+    """
+    Train classification algorithm.
+    
+    Train the Support Vector Machine classification algorithm using the
+    specified fields. 
+
+    Parameters
+    ----------
+    X: Pandas DataFrame
+        A DataFrame with the objects used for training the classifier.
+        Each object has the same number of fields used for training. 
+    
+    Y: Pandas DataFrame
+        A DataFrame with a single field representing the class id. 
+
+    output_filename: string
+        Output filename of the pickled trained SVM model. 
+
+    Returns
+    -------
+    clf: svm.SVC
+        Returns a trained SVM model that can be used to classify other data.
+
+    """
+
+    clf = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
+                   coef0=0.0, decision_function_shape='ovr', degree=3,
+                   gamma=7.694015754766104e-05, kernel='rbf', max_iter=-1,
+                   probability=False, random_state=None, shrinking=True,
+                   tol=0.001, verbose=False)
+    clf.fit(X, Y)
+    pprint(vars(clf))
+    pickle.dump(clf, open(output_filename, "wb"))
+    
+    return clf
+
+
 if __name__ == "__main__":
     import os
     if not os.path.exists("output"):
@@ -121,7 +159,7 @@ if __name__ == "__main__":
         training_path = "/data1/guatemala/training/"
     ############################
 
-    image_list = glob(training_path + "training_new_IMG_*.tif")
+    image_list = sorted(glob(training_path + "training_new_IMG_*.tif"))
 
     startTime = time.time()
     segment(image_list)
