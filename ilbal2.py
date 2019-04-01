@@ -83,10 +83,19 @@ def segment(image_list):
     for i, image in enumerate(image_list):
         vout = _segment(image)
 
-        vout['geom'] = vout['geometry'].apply(lambda x: WKTElement(x.wkt, srid=9001))
-        vout.drop('geometry', 1, inplace=True)
-        vout.to_sql('training', engine, 'nate', if_exists='append', index=False,
-                    dtype={'geom': Geometry('POLYGON', srid=9001)})
+        print(vout.columns)
+        if 'geometry' not in vout.columns:
+            print("There is no geometry column.")
+        else:
+            print("The table has a geometry column!")
+        try:
+            vout['geom'] = vout['geometry'].apply(lambda x: WKTElement(x.wkt, srid=9001))
+            vout.drop('geometry', 1, inplace=True)
+            vout.to_sql('training', engine, 'nate', if_exists='append', index=False,
+                        dtype={'geom': Geometry('POLYGON', srid=9001)})
+        except:
+            print("Failed to create geom from geometry and write it to SQL \
+                  for image: " + image)
 
 
 def _train(training):
