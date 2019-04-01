@@ -94,32 +94,6 @@ def _train(training):
 
 
 def train(filename):
-    # open connection to database
-    connection_string = environ.get('guat_obia_connection_string',
-                                    'postgresql://nate:nate@localhost:5432/guat_obia')
-    engine = create_engine(connection_string)
-
-    # SELECT tables from PostGIS
-    segs = gpd.read_postgis('SELECT * FROM training;', engine)
-    training_vecs = gpd.read_postgis('SELECT * FROM training_vectors;', engine)
-
-    # Spatial join
-    training = gpd.sjoin(training_vecs, segs);
-    training = training.drop(['dn', 'geometry'], axis=1)
-
-    # Train model
-    model = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
-                   coef0=0.0, decision_function_shape='ovr', degree=3,
-                   gamma=7.694015754766104e-05, kernel='rbf', max_iter=-1,
-                   probability=False, random_state=None, shrinking=True,
-                   tol=0.001, verbose=False)
-    model.fit(X, Y)
-    
-    # Save trained model
-    pickle.dump(model, open(filename, "wb"))
-
-
-def train_classifier(X, Y, output_filename):
     """
     Train classification algorithm.
     
@@ -144,17 +118,31 @@ def train_classifier(X, Y, output_filename):
         Returns a trained SVM model that can be used to classify other data.
 
     """
+    # open connection to database
+    connection_string = environ.get('guat_obia_connection_string',
+                                    'postgresql://nate:nate@localhost:5432/guat_obia')
+    engine = create_engine(connection_string)
 
-    clf = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
+    # SELECT tables from PostGIS
+    segs = gpd.read_postgis('SELECT * FROM training;', engine)
+    training_vecs = gpd.read_postgis('SELECT * FROM training_vectors;', engine)
+
+    # Spatial join
+    training = gpd.sjoin(training_vecs, segs);
+    training = training.drop(['dn', 'geometry'], axis=1)
+    X = training[:] # Select the parameter fields
+    Y = training[:] # Select the class id field
+
+    # Train model
+    model = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
                    coef0=0.0, decision_function_shape='ovr', degree=3,
                    gamma=7.694015754766104e-05, kernel='rbf', max_iter=-1,
                    probability=False, random_state=None, shrinking=True,
                    tol=0.001, verbose=False)
-    clf.fit(X, Y)
-    pprint(vars(clf))
-    pickle.dump(clf, open(output_filename, "wb"))
+    model.fit(X, Y)
     
-    return clf
+    # Save trained model
+    pickle.dump(model, open(filename, "wb"))
 
 
 if __name__ == "__main__":
@@ -172,6 +160,7 @@ if __name__ == "__main__":
 
     ##### Segmentation #####
     image_list = sorted(glob(training_path + "training_new_IMG_*.tif"))
+#    image_list = [training_path + "training_new_IMG_3581.tif"]
 
     startTime = time.time()
     segment(image_list)
@@ -179,10 +168,10 @@ if __name__ == "__main__":
     print("The segmentation took " + str(endTime - startTime) + " seconds to complete.")
 
     ##### Training #####
-    startTime = time.time()
-    train("output/" + datetime + ".svm")
-    endTime = time.time()
-    print("The training took " + str(endTime - startTime) + " seconds to complete.")
+#    startTime = time.time()
+#    train("output/model.svm") # change the model name...
+#    endTime = time.time()
+#    print("The training took " + str(endTime - startTime) + " seconds to complete.")
 
 #    test()
 #    verify()
