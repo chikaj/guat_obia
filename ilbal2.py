@@ -85,9 +85,9 @@ def segment(image_list):
 
         print(vout.columns)
         if 'geometry' not in vout.columns:
-            print("There is no geometry column.")
+            print("There is no geometry column in the table for image  " + image)
         else:
-            print("The table has a geometry column!")
+            print("Table for image: " + image + " has a geometry column!")
         try:
             vout['geom'] = vout['geometry'].apply(lambda x: WKTElement(x.wkt, srid=9001))
             vout.drop('geometry', 1, inplace=True)
@@ -160,7 +160,7 @@ if __name__ == "__main__":
         os.makedirs("output")
 
     ##### Set the location #####
-    location = "local" # "local" or "txgisci"
+    location = "txgisci" # "local" or "txgisci"
     if location == "local":
         training_path = "/home/nate/Documents/Research/Guatemala/training/"
     else:
