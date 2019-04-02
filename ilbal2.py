@@ -96,6 +96,8 @@ def segment(image_list):
             print("Failed to create geom from geometry and write it to SQL \
                   for image: " + image)
 
+        vout = None
+
 
 def _train(training):
     pass
@@ -159,7 +161,7 @@ if __name__ == "__main__":
         os.makedirs("output")
 
     ##### Set the location #####
-    location = "local" # "local" or "txgisci"
+    location = "txgisci" # "local" or "txgisci"
     if location == "local":
         training_path = "/home/nate/Documents/Research/Guatemala/training/"
     else:
