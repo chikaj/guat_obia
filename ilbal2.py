@@ -83,7 +83,6 @@ def segment(image_list):
     for i, image in enumerate(image_list):
         vout = _segment(image)
 
-        print(vout.columns)
         if 'geometry' not in vout.columns:
             print("There is no geometry column in the table for image  " + image)
         else:
@@ -160,7 +159,7 @@ if __name__ == "__main__":
         os.makedirs("output")
 
     ##### Set the location #####
-    location = "txgisci" # "local" or "txgisci"
+    location = "local" # "local" or "txgisci"
     if location == "local":
         training_path = "/home/nate/Documents/Research/Guatemala/training/"
     else:
@@ -169,7 +168,7 @@ if __name__ == "__main__":
 
     ##### Segmentation #####
     image_list = sorted(glob(training_path + "training_new_IMG_*.tif"))
-#    image_list = [training_path + "training_new_IMG_3581.tif"]
+    image_list = [training_path + "training_new_IMG_3581.tif"]
 
     startTime = time.time()
     segment(image_list)
