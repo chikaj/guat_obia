@@ -395,8 +395,7 @@ def add_shape_properties(classified_image, gdf, attributes=['area', 'perimeter']
                 gdf.insert(len(gdf.columns)-1, a, gdf.geometry.length)
             else:
                 gdf.insert(len(gdf.columns)-1, a, attributes[a])
-    except AttributeError as err:
-        print(err)
+    except:
         print("The geometry is bad for this gdf.")
         print(gdf.geom)
     
