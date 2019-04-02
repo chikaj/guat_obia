@@ -217,9 +217,11 @@ def segmentation(model=None, params=None, src=None, bands=[1,2,3], image=None,
         output = modal(output.astype('int16'), selem=disk(modal_radius),
                        mask=mask)
 
-    output = features.sieve(output, sieve_size, mask=mask,
-                            connectivity=8) * mask
-    output = label(output, connectivity=2)
+#    output = features.sieve(output, sieve_size, mask=mask,
+#                            connectivity=8) * mask
+    output = features.sieve(output, sieve_size, mask=mask) * mask
+#    output = label(output, connectivity=2)
+    output = label(output, connectivity=1)
     
     output = bip_to_bsq(output[:, :, np.newaxis]) * mask
 
@@ -272,7 +274,8 @@ def vectorize(src=None, image=None, transform=None, crs=None):
     else:
         img = image[0].astype(np.int32)
         
-    shps = features.shapes(img, connectivity=8, transform=transform)
+#    shps = features.shapes(img, connectivity=8, transform=transform)
+    shps = features.shapes(img, transform=transform)
     records = []
 
     for id, shp in enumerate(shps):

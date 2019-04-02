@@ -91,7 +91,7 @@ def segment(image_list):
             vout['geom'] = vout['geometry'].apply(lambda x: WKTElement(x.wkt, srid=9001))
             vout.drop('geometry', 1, inplace=True)
             vout.to_sql('training', engine, 'nate', if_exists='append', index=False,
-                        dtype={'geom': Geometry('POLYGON', srid=9001)})
+                        dtype={'geom': Geometry('MULTIPOLYGON', srid=9001)})
         except:
             print("Failed to create geom from geometry and write it to SQL \
                   for image: " + image)
@@ -170,7 +170,7 @@ if __name__ == "__main__":
 
     ##### Segmentation #####
     image_list = sorted(glob(training_path + "training_new_IMG_*.tif"))
-    image_list = [training_path + "training_new_IMG_3581.tif"]
+#    image_list = [training_path + "training_new_IMG_3581.tif"]
 
     startTime = time.time()
     segment(image_list)
