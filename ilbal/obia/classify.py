@@ -24,7 +24,7 @@ from sklearn.model_selection import RandomizedSearchCV
 import pickle
 
 
-def train(segments, actual, output_filename):
+def train(X, Y):
     """
     Train classification algorithm.
     
@@ -33,11 +33,11 @@ def train(segments, actual, output_filename):
 
     Parameters
     ----------
-    segments: numpy 2D array
+    X: numpy 2D array
         A 2D numpy array where there is one row for each segment and each
         column represents an attribute of the segments. 
 
-    actual: numpy 1D array
+    Y: numpy 1D array
         A 1D numpy array equal in length to the number of records in segments.
         The single column contains actual class values for each of the
         segments.
@@ -64,13 +64,14 @@ def train(segments, actual, output_filename):
     random_search = RandomizedSearchCV(clf, param_distributions=param_dist,
                                    n_iter=n_iter_search)
 
-    random_search.fit(segments, actual) # this may take time...
-    pickle.dump(random_search, open(output_filename, "wb"))
+    random_search.fit(X, Y) # this may take time...
+
+#    pickle.dump(random_search, open(output_filename, "wb"))
     
-    return clf
+    return random_search
 
 
-def predict(model, segments):
+def predict(model, X):
     """
     Classify segments using a trained SVM model
 
@@ -81,11 +82,11 @@ def predict(model, segments):
      model: svm.SVC
         A trained SVM model that can be used to classify other data.
 
-    segments: numpy 2D array
+    X: numpy 2D array
         A 2D numpy array where there is one row for each segment and each
         column represents an attribute of the segments. Identical to segments
         from the train_classifier function.
     """
-    predictions = model.predict(segments)
+    predictions = model.predict(X)
 
     return predictions

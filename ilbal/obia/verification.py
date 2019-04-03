@@ -41,9 +41,15 @@ def cross_tabulation(actual, predicted, num_classes):
 #    for i in range(0, predicted.size):
 #        crosstab[predicted[i]-1][actual[i]-1] += 1
     
+#    crosstab = np.zeros((num_classes, num_classes))
+#    for i in range(0, actual.size):
+#        crosstab[predicted[i]-1][actual[i]-1] += 1
+
     crosstab = np.zeros((num_classes, num_classes))
-    for i in range(0, actual.size):
-        crosstab[predicted[i]-1][actual[i]-1] += 1
+    for i in range(0, predicted.size):
+        p = predicted[i]
+        a = actual[i]
+        crosstab[p-1][a-1] += 1
     
     return crosstab
 

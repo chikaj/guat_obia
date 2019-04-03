@@ -75,11 +75,7 @@ def _segment(filename):
         return vout
 
 
-def segment(image_list):
-    connection_string = environ.get('guat_obia_connection_string',
-                                    'postgresql://nate:nate@localhost:5432/guat_obia')
-    engine = create_engine(connection_string)
-
+def segment(image_list, table_name, engine):
     for i, image in enumerate(image_list):
         vout = _segment(image)
 
@@ -90,8 +86,8 @@ def segment(image_list):
         try:
             vout['geom'] = vout['geometry'].apply(lambda x: WKTElement(x.wkt, srid=9001))
             vout.drop('geometry', 1, inplace=True)
-            vout.to_sql('training', engine, 'nate', if_exists='append', index=False,
-                        dtype={'geom': Geometry('MULTIPOLYGON', srid=9001)})
+            vout.to_sql(table_name, engine, 'nate', if_exists='append', index=False,
+                        dtype={'geom': Geometry('POLYGON', srid=9001)})
         except:
             print("Failed to create geom from geometry and write it to SQL \
                   for image: " + image)
@@ -99,11 +95,7 @@ def segment(image_list):
         vout = None
 
 
-def _train(training):
-    pass
-
-
-def train(filename):
+def train(X, Y):
     """
     Train classification algorithm.
     
@@ -128,22 +120,6 @@ def train(filename):
         Returns a trained SVM model that can be used to classify other data.
 
     """
-    # open connection to database
-    connection_string = environ.get('guat_obia_connection_string',
-                                    'postgresql://nate:nate@localhost:5432/guat_obia')
-    engine = create_engine(connection_string)
-
-    # SELECT tables from PostGIS
-    segs = gpd.read_postgis('SELECT * FROM training;', engine)
-    training_vecs = gpd.read_postgis('SELECT * FROM training_vectors;', engine)
-
-    # Spatial join
-    training = gpd.sjoin(training_vecs, segs);
-    training = training.drop(['dn', 'geometry'], axis=1)
-    X = training[:] # Select the parameter fields
-    Y = training[:] # Select the class id field
-
-    # Train model
     model = svm.SVC(C=14.344592902738631, cache_size=200, class_weight=None,
                    coef0=0.0, decision_function_shape='ovr', degree=3,
                    gamma=7.694015754766104e-05, kernel='rbf', max_iter=-1,
@@ -151,8 +127,29 @@ def train(filename):
                    tol=0.001, verbose=False)
     model.fit(X, Y)
     
-    # Save trained model
-    pickle.dump(model, open(filename, "wb"))
+    # Return trained model
+    return model
+
+
+def predict(model, X):
+    """
+    Classify segments using a trained SVM model
+
+    Classify image segments using the trained Support Vector Machine model. 
+
+    Parameters
+    ----------
+     model: svm.SVC
+        A trained SVM model that can be used to classify other data.
+
+    segments: numpy 2D array
+        A 2D numpy array where there is one row for each segment and each
+        column represents an attribute of the segments. Identical to segments
+        from the train_classifier function.
+    """
+    predictions = model.predict(X)
+
+    return predictions
 
 
 if __name__ == "__main__":
@@ -161,27 +158,93 @@ if __name__ == "__main__":
         os.makedirs("output")
 
     ##### Set the location #####
-    location = "txgisci" # "local" or "txgisci"
+    location = "local" # "local" or "txgisci"
     if location == "local":
         training_path = "/home/nate/Documents/Research/Guatemala/training/"
+        verification_path = "/home/nate/Documents/Research/Guatemala/verification/"
     else:
         training_path = "/data1/guatemala/training/"
+        verification_path = "/data1/guatemala/verification/"
     ############################
 
     ##### Segmentation #####
     image_list = sorted(glob(training_path + "training_new_IMG_*.tif"))
 #    image_list = [training_path + "training_new_IMG_3581.tif"]
+    
+    connection_string = environ.get('guat_obia_connection_string',
+                                    'postgresql://nate:nate@localhost:5432/guat_obia')
+    engine = create_engine(connection_string)
 
-    startTime = time.time()
-    segment(image_list)
-    endTime = time.time()
-    print("The segmentation took " + str(endTime - startTime) + " seconds to complete.")
+    ##### Segmentation #####
+#    startTime = time.time()
+#    training_table_name = 'verification_segments'
+#    segment(image_list, training_table_name, engine)
+#    endTime = time.time()
+#    print("The segmentation took " + str(endTime - startTime) + " seconds to complete.")
 
     ##### Training #####
-#    startTime = time.time()
-#    train("output/model.svm") # change the model name...
-#    endTime = time.time()
-#    print("The training took " + str(endTime - startTime) + " seconds to complete.")
+    startTime = time.time()
+    
+    train_test = gpd.read_postgis('SELECT * FROM train_on_this_table;', engine)
+    
+    msk = np.random.rand(len(train_test)) < 0.75
+    
+    training_set = train_test[msk]
+    test_set = train_test[~msk]
+    
+    trainX = training_set.drop(['class', 'class_id', 'geom'], axis=1)
+    trainY = training_set['class_id']
+    model = cl.train(trainX, trainY)
+    pickle.dump(model, open("output/model.svm", "wb"))
+    
+    endTime = time.time()
+    print("The training took " + str(endTime - startTime) + 
+          " seconds to complete.")
 
-#    test()
-#    verify()
+
+    ##### Predict and Test #####
+    startTime = time.time()
+    
+    testX = test_set.drop(['class', 'class_id', 'geom'], axis=1)
+    testY = test_set['class_id']
+    predictions = cl.predict(model, testX)
+    ct = v.cross_tabulation(testY.values, predictions, 11)
+    overall, producers, users, kappa = v.accuracy(ct)
+    print("The overall accuracy is: " + str(overall))
+    print("The producers accuracy is: " + str(producers))
+    print("The users accuracy is: " + str(users))
+    print("The kappa accuracy is: " + str(kappa))
+    
+    endTime = time.time()
+    print("The predicting and testing took " + str(endTime - startTime) + 
+          " seconds to complete.")
+
+    ##### Verification #####
+    startTime = time.time()
+
+    # segment verification images
+    verification_table_name = 'verification_segments'
+    verification_list = sorted(glob(verification_path + "training_new_IMG_*.tif"))
+    segment(verification_list, verification_table_name, engine)
+
+    # get verification vectors
+    verify = gpd.read_postgis('SELECT * FROM ' +
+                                    verification_table_name + ';', engine)
+
+    # compute intersection of verify and verification table!
+
+    verifyX = verify.drop(['class', 'class_id', 'geom'], axis=1)
+    verifyY = verify['class_id']
+    predictions = cl.predict(model, verifyX)
+    
+    ct = v.cross_tabulation(verifyY.values, predictions, 11)
+    overall, producers, users, kappa = v.accuracy(ct)
+    print("The overall accuracy is: " + str(overall))
+    print("The producers accuracy is: " + str(producers))
+    print("The users accuracy is: " + str(users))
+    print("The kappa accuracy is: " + str(kappa))
+    
+
+    endTime = time.time()
+    print("The verification took " + str(endTime - startTime) + 
+          " seconds to complete.")
